@@ -1,0 +1,5 @@
+# Maximum width of each line
+#max_width = 80
+
+# Use tab characters for indentation, spaces for alignment
+hard_tabs = true

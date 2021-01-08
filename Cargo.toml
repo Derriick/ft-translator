@@ -1,0 +1,13 @@
+[package]
+name = "ft-translator"
+version = "0.1.0"
+authors = ["Derriick <derriick.ensiie@yahoo.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+csv = "1"
+encoding_rs = "0.8"
+encoding_rs_io = "0.1"
+serde = { version = "1", features = ["derive"] }
