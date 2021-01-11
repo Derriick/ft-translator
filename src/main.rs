@@ -1,13 +1,9 @@
-#[allow(dead_code)]
-#[allow(unused)]
-#[allow(unused_imports)]
-
-use std::collections::HashSet;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
+use std::path::Path;
 
-use anyhow::{anyhow, Result};
-use clap::{App, Arg, ArgMatches, Values};
+use anyhow::Result;
+use clap::{App, Arg, ArgMatches};
 use encoding_rs_io::DecodeReaderBytes;
 use env_logger;
 use log::{error, LevelFilter};
@@ -52,44 +48,60 @@ fn main() {
 		.version(env!("CARGO_PKG_VERSION"))
 		.author(env!("CARGO_PKG_AUTHORS"))
 		.about(env!("CARGO_PKG_DESCRIPTION"))
-		.arg(Arg::with_name(key::CREATE_DICT)
-		     .long(key::CREATE_DICT)
-		     .short(key::short::CREATE_DICT)
-		     .value_names(&["SRC"])
-		     .min_values(1)
-		     .max_values(2)
-		     .conflicts_with_all(&[key::MERGE_DICT, key::SWAP_DICT, key::TRANSLATE])
-		     .help("Create a new dictionary from a source file, and optionaly a destination file"))
-		.arg(Arg::with_name(key::MERGE_DICT)
-		     .long(key::MERGE_DICT)
-		     .short(key::short::MERGE_DICT)
-		     .value_names(&["DICT1", "DICT2"])
-		     .conflicts_with_all(&[key::CREATE_DICT, key::SWAP_DICT, key::TRANSLATE])
-		     .help("Merge two dictionaries"))
-		.arg(Arg::with_name(key::SWAP_DICT)
-		     .long(key::SWAP_DICT)
-		     .short(key::short::SWAP_DICT)
-		     .value_names(&["DICT"])
-		     .conflicts_with_all(&[key::CREATE_DICT, key::MERGE_DICT, key::TRANSLATE])
-		     .help("Swap the source and destination of a dictionary"))
-		.arg(Arg::with_name(key::TRANSLATE)
-		     .long(key::TRANSLATE)
-		     .short(key::short::TRANSLATE)
-		     .value_names(&["SRC", "DICT"])
-		     .conflicts_with_all(&[key::CREATE_DICT, key::MERGE_DICT, key::SWAP_DICT])
-		     .help("Translate a source file with a dictionary"))
-		//.arg(Arg::with_name(key::OUTPUT)
-		//     .long(key::OUTPUT)
-		//     .short(key::short::OUTPUT)
-		//     .value_name("FILE")
-		//     .help("Save the result in a file instead of writing in the the standard output"))
-		.arg(Arg::with_name(key::VERBOSITY)
-		     .long(key::VERBOSITY)
-		     .short(key::short::VERBOSITY)
-		     .multiple(true)
-		     .help("Set the level of verbosity, the number of occurences inscreases the verbosity"))
+		.arg(
+			Arg::with_name(key::CREATE_DICT)
+				.long(key::CREATE_DICT)
+				.short(key::short::CREATE_DICT)
+				.value_names(&["SRC"])
+				.min_values(1)
+				.max_values(2)
+				.conflicts_with_all(&[key::MERGE_DICT, key::SWAP_DICT, key::TRANSLATE])
+				.help(
+					"Create a new dictionary from a source file, and optionaly a destination file",
+				),
+		)
+		.arg(
+			Arg::with_name(key::MERGE_DICT)
+				.long(key::MERGE_DICT)
+				.short(key::short::MERGE_DICT)
+				.value_names(&["DICT1", "DICT2"])
+				.conflicts_with_all(&[key::CREATE_DICT, key::SWAP_DICT, key::TRANSLATE])
+				.help("Merge two dictionaries"),
+		)
+		.arg(
+			Arg::with_name(key::SWAP_DICT)
+				.long(key::SWAP_DICT)
+				.short(key::short::SWAP_DICT)
+				.value_names(&["DICT"])
+				.conflicts_with_all(&[key::CREATE_DICT, key::MERGE_DICT, key::TRANSLATE])
+				.help("Swap the source and destination of a dictionary"),
+		)
+		.arg(
+			Arg::with_name(key::TRANSLATE)
+				.long(key::TRANSLATE)
+				.short(key::short::TRANSLATE)
+				.value_names(&["SRC", "DICT"])
+				.conflicts_with_all(&[key::CREATE_DICT, key::MERGE_DICT, key::SWAP_DICT])
+				.help("Translate a source file with a dictionary"),
+		)
+		//.arg(
+		//	Arg::with_name(key::OUTPUT)
+		//		.long(key::OUTPUT)
+		//		.short(key::short::OUTPUT)
+		//		.value_name("FILE")
+		//		.help("Save the result in a file instead of writing in the the standard output"),
+		//)
+		.arg(
+			Arg::with_name(key::VERBOSITY)
+				.long(key::VERBOSITY)
+				.short(key::short::VERBOSITY)
+				.multiple(true)
+				.help(
+					"Set the level of verbosity, the number of occurences inscreases the verbosity",
+				),
+		)
 		.get_matches();
-	
+
 	env_logger::builder()
 		.filter_level(verbosity(matches.occurrences_of(key::VERBOSITY)))
 		.init();
@@ -110,51 +122,66 @@ pub fn verbosity(level: u64) -> LevelFilter {
 }
 
 fn run(matches: ArgMatches) -> Result<()> {
-	let _ = if let Some(mut values) = matches.values_of(key::CREATE_DICT) {
-		let src = values.next().unwrap();
-		if let Some(dst) = values.next() {
-			Dict::from_src_dst(src, dst)
+	let result = if let Some(mut values) = matches.values_of(key::CREATE_DICT) {
+		let path_src = values.next().unwrap();
+		let result = if let Some(path_dst) = values.next() {
+			dict_from_src_dst(path_src, path_dst)?
 		} else {
-			Dict::from_src(src)
-		}
+			dict_from_src(path_src)?
+		};
+		let mut result = result
+			.into_iter()
+			.collect::<Vec<_>>();
+			result.sort();
+		result
 	} else {
 		todo!();
 	};
 
-	let file = File::open("input.csv")?;
-	let mut decoder = DecodeReaderBytes::new(file);
-	let mut transcoded = String::new();
-	decoder.read_to_string(&mut transcoded)?;
-
-	let mut content = String::new();
-	for line in transcoded.lines() {
-		if !line.starts_with('#') {
-			content.push_str(&line);
-			content.push_str("\n");
-		}
-	}
-	
-	// Build the CSV reader and iterate over each record.
-	let mut rdr = csv::ReaderBuilder::new()
+	let mut wtr = csv::WriterBuilder::new()
 		.delimiter(b'\t')
 		.has_headers(false)
-		.from_reader(content.as_bytes());
-
-	let mut dict = HashSet::new();
-	for result in rdr.deserialize() {
-		// The iterator yields Result<StringRecord, Error>, so we check the
-		// error here..
-		let entry: Entry = result?;
-		dict.insert(entry.text);
-	}
-	let mut dict = dict.into_iter().map(|text| text.unwrap_or(String::new())).collect::<Vec<_>>();
-	dict.sort();
-
-	let mut wtr = csv::WriterBuilder::new().delimiter(b'\t').has_headers(false).from_path("output.csv")?;
-	for entry in dict {
-		let _ = wtr.serialize(DictEntry {src: entry, dst: String::new()})?;
+		.from_writer(io::stdout());
+	for record in result {
+		let _ = wtr.serialize(record)?;
 	}
 	wtr.flush()?;
 
 	Ok(())
+}
+
+fn dict_from_src<P>(path: P) -> Result<Dict>
+where
+	P: AsRef<Path>,
+{
+	let src = read_file(path)?;
+	Dict::from_src(&src)
+}
+
+fn dict_from_src_dst<P, Q>(path_src: P, path_dst: Q) -> Result<Dict>
+where
+	P: AsRef<Path>,
+	Q: AsRef<Path>,
+{
+	let src = read_file(path_src)?;
+	let dst = read_file(path_dst)?;
+	Dict::from_src_dst(&src, &dst)
+}
+
+fn read_file<P>(path: P) -> Result<String>
+where
+	P: AsRef<Path>,
+{
+	let file = File::open(path)?;
+	let mut decoder = DecodeReaderBytes::new(file);
+	let mut transcoded = String::new();
+	decoder.read_to_string(&mut transcoded)?;
+
+	let content = transcoded
+		.lines()
+		.filter(|l| !l.starts_with('#'))
+		.collect::<Vec<_>>()
+		.join("\n");
+
+	Ok(content)
 }
