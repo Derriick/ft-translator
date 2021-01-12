@@ -7,8 +7,20 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DictError {
-	#[error("data store disconnected")]
+	#[error("parsing invalid")]
 	ParsingError(#[from] csv::Error),
+	#[error("unknown dict error")]
+	Unknown,
+}
+
+#[derive(Error, Debug)]
+pub enum CsvError {
+	#[error("invalid serialization")]
+	SerializeError(#[from] csv::Error),
+	#[error("invalid parsing")]
+	WriteError(#[from] io::Error),
+	#[error("unknown csv error")]
+	Unknown,
 }
 
 pub struct Dict(HashMap<String, Option<String>>);
@@ -62,7 +74,7 @@ where
 		.from_reader(reader)
 }
 
-pub fn write_csv<I, S, W>(records: I, writer: W) -> io::Result<()>
+pub fn write_csv<I, S, W>(records: I, writer: W) -> Result<(), CsvError>
 where
 	I: IntoIterator<Item = S>,
 	S: Serialize,
@@ -72,6 +84,9 @@ where
 		.delimiter(b'\t')
 		.has_headers(false)
 		.from_writer(writer);
-	let _ = records.into_iter().map(|r| writer.serialize(r));
-	writer.flush()
+	for record in records {
+		let _ = writer.serialize(record)?;
+	}
+	let _ = writer.flush()?;
+	Ok(())
 }
