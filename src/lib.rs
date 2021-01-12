@@ -6,7 +6,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum DataStoreError {
+pub enum DictError {
 	#[error("data store disconnected")]
 	ParsingError(#[from] csv::Error),
 }
@@ -24,7 +24,7 @@ impl IntoIterator for Dict {
 }
 
 impl Dict {
-	pub fn from_src(src: &str) -> Result<Dict, DataStoreError> {
+	pub fn from_src(src: &str) -> Result<Dict, DictError> {
 		let mut reader = read_csv(src.as_bytes());
 		let mut dict = HashMap::new();
 
@@ -36,7 +36,7 @@ impl Dict {
 		Ok(Dict(dict))
 	}
 
-	pub fn from_src_dst(src: &str, dst: &str) -> Result<Dict, DataStoreError> {
+	pub fn from_src_dst(src: &str, dst: &str) -> Result<Dict, DictError> {
 		let mut reader_src = read_csv(src.as_bytes());
 		let mut reader_dst = read_csv(dst.as_bytes());
 		let mut dict = HashMap::new();
