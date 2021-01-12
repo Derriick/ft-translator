@@ -1,13 +1,14 @@
 use std::io;
 
 use anyhow::Result;
-use clap::ArgMatches;
 use env_logger;
 use log::error;
 use serde::{Deserialize, Serialize};
 
 mod file;
 mod options;
+use file::*;
+use options::*;
 
 #[derive(Debug, Deserialize)]
 struct Entry {
@@ -24,42 +25,47 @@ struct DictEntry {
 }
 
 fn main() {
-	let matches = options::matches();
+	let options = Options::new();
 
 	env_logger::builder()
-		.filter_level(options::verbosity(&matches))
+		.filter_level(options.verbosity())
 		.init();
 
-	if let Err(err) = run(matches) {
+	if let Err(err) = run(options) {
 		error!("{}", err);
 	}
 }
 
 #[inline]
-fn run(matches: ArgMatches) -> Result<()> {
-	let result = {
-		if let Some(mut values) = matches.values_of(options::CREATE_DICT) {
-			let path_src = values.next().unwrap();
-			let dict = match values.next() {
-				Some(path_dst) => file::dict_from_src_dst(path_src, path_dst)?,
-				None => file::dict_from_src(path_src)?,
-			};
-			let mut result = dict.into_iter().collect::<Vec<_>>();
-			result.sort();
-			result
-		} else {
-			todo!();
-		}
+fn run(options: Options) -> Result<()> {
+	let result = match options.command() {
+		Command::CreateDict(path_src, None) => dict_from_src(path_src)?,
+		Command::CreateDict(path_src, Some(path_dst)) => dict_from_src_dst(path_src, path_dst)?,
+		_ => todo!(),
 	};
 
-	let mut wtr = csv::WriterBuilder::new()
-		.delimiter(b'\t')
-		.has_headers(false)
-		.from_writer(io::stdout());
-	for record in result {
-		let _ = wtr.serialize(record)?;
+	let mut result = result.into_iter().collect::<Vec<_>>();
+	result.sort();
+
+	if let Some(path) = options.output() {
+		let mut wtr = csv::WriterBuilder::new()
+			.delimiter(b'\t')
+			.has_headers(false)
+			.from_path(path)?;
+		for record in result {
+			let _ = wtr.serialize(record)?;
+		}
+		wtr.flush()?;
+	} else {
+		let mut wtr = csv::WriterBuilder::new()
+			.delimiter(b'\t')
+			.has_headers(false)
+			.from_writer(io::stdout());
+		for record in result {
+			let _ = wtr.serialize(record)?;
+		}
+		wtr.flush()?;
 	}
-	wtr.flush()?;
 
 	Ok(())
 }

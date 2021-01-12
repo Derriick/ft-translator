@@ -38,7 +38,7 @@ where
 
 	Ok(content
 		.lines()
-		.skip_while(|l| l.starts_with('#'))
+		.skip_while(|l| l.starts_with("# "))
 		.collect::<Vec<_>>()
 		.join("\n"))
 }
