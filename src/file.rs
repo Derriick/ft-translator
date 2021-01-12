@@ -1,33 +1,57 @@
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use encoding_rs_io::DecodeReaderBytes;
+use serde::Serialize;
 
-use ft_translator::Dict;
+use ft_translator::*;
 
 #[inline]
-pub fn dict_from_src<P>(path: P) -> Result<Dict>
-where
-	P: AsRef<Path>,
-{
-	let src = read_csv(path)?;
-	Dict::from_src(&src)
+pub fn dict_from_src(path: &Path) -> Result<Dict> {
+	let src = read_file(path)?;
+	Dict::from_src(&src).with_context(|| {
+		format!(
+			"Failed to create dictionary from source file '{}'",
+			path.display()
+		)
+	})
 }
 
 #[inline]
-pub fn dict_from_src_dst<P, Q>(path_src: P, path_dst: Q) -> Result<Dict>
-where
-	P: AsRef<Path>,
-	Q: AsRef<Path>,
-{
-	let src = read_csv(path_src)?;
-	let dst = read_csv(path_dst)?;
-	Dict::from_src_dst(&src, &dst)
+pub fn dict_from_src_dst(path_src: &Path, path_dst: &Path) -> Result<Dict> {
+	let src = read_file(path_src)?;
+	let dst = read_file(path_dst)?;
+	Dict::from_src_dst(&src, &dst).with_context(|| {
+		format!(
+			"Failed to create dictionary from source file '{}' and dest. file '{}'",
+			path_src.display(),
+			path_dst.display()
+		)
+	})
 }
 
-fn read_csv<P>(path: P) -> Result<String>
+pub fn write_csv_file<I, S>(records: I, path: &Path) -> Result<()>
+where
+	I: IntoIterator<Item = S>,
+	S: Serialize,
+{
+	let writer = File::create(path)?;
+	write_csv(records, writer)
+		.with_context(|| format!("Failed to write CSV records to file '{}'", path.display()))
+}
+
+pub fn write_csv_stdout<I, S>(records: I) -> Result<()>
+where
+	I: IntoIterator<Item = S>,
+	S: Serialize,
+{
+	write_csv(records, io::stdout())
+		.with_context(|| format!("Failed to write CSV records to STDOUT"))
+}
+
+fn read_file<P>(path: P) -> Result<String>
 where
 	P: AsRef<Path>,
 {

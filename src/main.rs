@@ -1,5 +1,3 @@
-use std::io;
-
 use anyhow::Result;
 use env_logger;
 use log::error;
@@ -36,7 +34,6 @@ fn main() {
 	}
 }
 
-#[inline]
 fn run(options: Options) -> Result<()> {
 	let result = match options.command() {
 		Command::CreateDict(path_src, None) => dict_from_src(path_src)?,
@@ -47,25 +44,8 @@ fn run(options: Options) -> Result<()> {
 	let mut result = result.into_iter().collect::<Vec<_>>();
 	result.sort();
 
-	if let Some(path) = options.output() {
-		let mut wtr = csv::WriterBuilder::new()
-			.delimiter(b'\t')
-			.has_headers(false)
-			.from_path(path)?;
-		for record in result {
-			let _ = wtr.serialize(record)?;
-		}
-		wtr.flush()?;
-	} else {
-		let mut wtr = csv::WriterBuilder::new()
-			.delimiter(b'\t')
-			.has_headers(false)
-			.from_writer(io::stdout());
-		for record in result {
-			let _ = wtr.serialize(record)?;
-		}
-		wtr.flush()?;
+	match options.output() {
+		Some(path) => write_csv_file(result, path),
+		None => write_csv_stdout(result),
 	}
-
-	Ok(())
 }

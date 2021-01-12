@@ -1,7 +1,15 @@
 use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
+use std::io::{self, Read, Write};
 
-use anyhow::Result;
+use serde::Serialize;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum DataStoreError {
+	#[error("data store disconnected")]
+	ParsingError(#[from] csv::Error),
+}
 
 pub struct Dict(HashMap<String, Option<String>>);
 
@@ -16,8 +24,8 @@ impl IntoIterator for Dict {
 }
 
 impl Dict {
-	pub fn from_src(src: &str) -> Result<Dict> {
-		let mut reader = get_reader(src);
+	pub fn from_src(src: &str) -> Result<Dict, DataStoreError> {
+		let mut reader = read_csv(src.as_bytes());
 		let mut dict = HashMap::new();
 
 		for record in reader.deserialize() {
@@ -28,9 +36,9 @@ impl Dict {
 		Ok(Dict(dict))
 	}
 
-	pub fn from_src_dst(src: &str, dst: &str) -> Result<Dict> {
-		let mut reader_src = get_reader(src);
-		let mut reader_dst = get_reader(dst);
+	pub fn from_src_dst(src: &str, dst: &str) -> Result<Dict, DataStoreError> {
+		let mut reader_src = read_csv(src.as_bytes());
+		let mut reader_dst = read_csv(dst.as_bytes());
 		let mut dict = HashMap::new();
 
 		for (record_src, record_dst) in reader_src.deserialize().zip(reader_dst.deserialize()) {
@@ -44,9 +52,26 @@ impl Dict {
 }
 
 #[inline]
-fn get_reader(text: &str) -> csv::Reader<&[u8]> {
+fn read_csv<R>(reader: R) -> csv::Reader<R>
+where
+	R: Read,
+{
 	csv::ReaderBuilder::new()
 		.delimiter(b'\t')
 		.has_headers(false)
-		.from_reader(text.as_bytes())
+		.from_reader(reader)
+}
+
+pub fn write_csv<I, S, W>(records: I, writer: W) -> io::Result<()>
+where
+	I: IntoIterator<Item = S>,
+	S: Serialize,
+	W: Write,
+{
+	let mut writer = csv::WriterBuilder::new()
+		.delimiter(b'\t')
+		.has_headers(false)
+		.from_writer(writer);
+	let _ = records.into_iter().map(|r| writer.serialize(r));
+	writer.flush()
 }
