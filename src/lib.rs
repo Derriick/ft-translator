@@ -36,26 +36,36 @@ impl IntoIterator for Dict {
 }
 
 impl Dict {
-	pub fn from_src(src: &str) -> Result<Dict, DictError> {
+	pub fn from_src<T>(src: &str, get_text: fn(T) -> String) -> Result<Dict, DictError>
+	where
+		T: for<'de> serde::Deserialize<'de>,
+	{
 		let mut reader = read_csv(src.as_bytes());
 		let mut dict = HashMap::new();
 
 		for record in reader.deserialize() {
-			let (_, _, _, src): (String, String, String, String) = record?;
+			let src = get_text(record?);
 			dict.insert(src, None);
 		}
 
 		Ok(Dict(dict))
 	}
 
-	pub fn from_src_dst(src: &str, dst: &str) -> Result<Dict, DictError> {
+	pub fn from_src_dst<T>(
+		src: &str,
+		dst: &str,
+		get_text: fn(T) -> String,
+	) -> Result<Dict, DictError>
+	where
+		T: for<'de> serde::Deserialize<'de>,
+	{
 		let mut reader_src = read_csv(src.as_bytes());
 		let mut reader_dst = read_csv(dst.as_bytes());
 		let mut dict = HashMap::new();
 
 		for (record_src, record_dst) in reader_src.deserialize().zip(reader_dst.deserialize()) {
-			let (_, _, _, src): (String, String, String, String) = record_src?;
-			let (_, _, _, dst): (String, String, String, String) = record_dst?;
+			let src = get_text(record_src?);
+			let dst = get_text(record_dst?);
 			dict.insert(src, Some(dst));
 		}
 

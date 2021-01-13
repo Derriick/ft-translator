@@ -8,10 +8,9 @@ use serde::Serialize;
 
 use ft_translator::*;
 
-#[inline]
 pub fn dict_from_src(path: &Path) -> Result<Dict> {
 	let src = read_file(path)?;
-	Dict::from_src(&src).with_context(|| {
+	Dict::from_src(&src, |record: (String, String, String, String)| record.3).with_context(|| {
 		format!(
 			"Failed to create dictionary from source file '{}'",
 			path.display()
@@ -19,11 +18,13 @@ pub fn dict_from_src(path: &Path) -> Result<Dict> {
 	})
 }
 
-#[inline]
 pub fn dict_from_src_dst(path_src: &Path, path_dst: &Path) -> Result<Dict> {
 	let src = read_file(path_src)?;
 	let dst = read_file(path_dst)?;
-	Dict::from_src_dst(&src, &dst).with_context(|| {
+	Dict::from_src_dst(&src, &dst, |record: (String, String, String, String)| {
+		record.3
+	})
+	.with_context(|| {
 		format!(
 			"Failed to create dictionary from source file '{}' and dest. file '{}'",
 			path_src.display(),
