@@ -22,7 +22,7 @@ pub fn dict_from_src_dst(path_src: &Path, path_dst: &Path) -> Result<Dict> {
 	let src = read_file(path_src)?;
 	let dst = read_file(path_dst)?;
 	Dict::from_src_dst(&src, &dst, |record: (String, String, String, String)| {
-		record.3
+		((record.0, record.1, record.2), record.3)
 	})
 	.with_context(|| {
 		format!(

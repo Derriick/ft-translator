@@ -1,5 +1,6 @@
 use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::io::{self, Read, Write};
 
 use serde::Serialize;
@@ -51,24 +52,31 @@ impl Dict {
 		Ok(Dict(dict))
 	}
 
-	pub fn from_src_dst<T>(
+	pub fn from_src_dst<T, K>(
 		src: &str,
 		dst: &str,
-		get_text: fn(T) -> String,
+		get_entry: fn(T) -> (K, String),
 	) -> Result<Dict, DictError>
 	where
 		T: for<'de> serde::Deserialize<'de>,
+		K: Hash + Eq,
 	{
-		let mut reader_src = read_csv(src.as_bytes());
-		let mut reader_dst = read_csv(dst.as_bytes());
-		let mut dict = HashMap::new();
-
-		for (record_src, record_dst) in reader_src.deserialize().zip(reader_dst.deserialize()) {
-			let src = get_text(record_src?);
-			let dst = get_text(record_dst?);
-			dict.insert(src, Some(dst));
+		let mut entries_src = HashMap::new();
+		for record in read_csv(src.as_bytes()).deserialize() {
+			let (key, value) = get_entry(record?);
+			entries_src.insert(key, value);
 		}
 
+		let mut entries_dst = HashMap::new();
+		for record in read_csv(dst.as_bytes()).deserialize() {
+			let (key, value) = get_entry(record?);
+			entries_dst.insert(key, value);
+		}
+
+		let dict: HashMap<_, _> = entries_src
+			.into_iter()
+			.map(|(key, value)| (value, entries_dst.get(&key).map(String::from)))
+			.collect();
 		Ok(Dict(dict))
 	}
 }
