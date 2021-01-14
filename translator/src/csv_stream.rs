@@ -3,7 +3,7 @@ use std::io::{self, Read};
 use std::path::Path;
 
 use encoding_rs_io::DecodeReaderBytes;
-pub use serde::Serialize;
+use serde::Serialize;
 use thiserror::Error;
 
 pub type Error = csv::Error;

@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use clap::{App, Arg, ArgMatches};
-use log::{LevelFilter};
+use log::LevelFilter;
 
 pub const CREATE_DICT: &str = "create-dict";
 pub const MERGE_DICT: &str = "merge-dict";

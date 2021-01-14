@@ -3,7 +3,7 @@ use std::io;
 use anyhow::{Context, Result};
 use env_logger;
 use log::error;
-use translator::csv_stream::{self, Serialize};
+use translator::csv_stream;
 use translator::dict::Dict;
 
 mod options;
@@ -35,8 +35,9 @@ fn run(options: Options) -> Result<()> {
 
 	match options.output() {
 		Some(path) => csv_stream::write_file(result, path)
-			.with_context(|| format!("Error when writing file '{}'", path.display())),
-		None => write_csv_stdout(result),
+			.with_context(|| format!("Failed to write CSV records to file '{}'", path.display())),
+		None => csv_stream::write(result, io::stdout())
+			.with_context(|| format!("Failed to write CSV records to STDOUT")),
 	}
 }
 
@@ -46,13 +47,4 @@ fn get_text(record: (String, String, String, String)) -> String {
 
 fn get_entry(record: (String, String, String, String)) -> ((String, String, String), String) {
 	((record.0, record.1, record.2), record.3)
-}
-
-pub fn write_csv_stdout<I, S>(records: I) -> Result<()>
-where
-	I: IntoIterator<Item = S>,
-	S: Serialize,
-{
-	csv_stream::write(records, io::stdout())
-		.with_context(|| format!("Failed to write CSV records to STDOUT"))
 }
