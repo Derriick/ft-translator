@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use clap::{App, Arg, ArgMatches};
-use log::LevelFilter;
+use log::{LevelFilter};
 
 pub const CREATE_DICT: &str = "create-dict";
 pub const MERGE_DICT: &str = "merge-dict";
@@ -61,7 +61,7 @@ impl Options {
 				let dict = values.next().unwrap();
 				Command::Translate(Path::new(src).to_path_buf(), Path::new(dict).to_path_buf())
 			} else {
-				panic!()
+				todo!()
 			}
 		};
 		let verbosity = match matches.occurrences_of(VERBOSITY) {

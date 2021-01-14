@@ -1,26 +1,22 @@
 use std::collections::hash_map::IntoIter;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::io::{self, Read, Write};
+use std::io;
+use std::path::Path;
 
-use serde::Serialize;
 use thiserror::Error;
+
+use crate::csv_stream;
 
 #[derive(Error, Debug)]
 pub enum DictError {
-	#[error("parsing invalid")]
-	ParsingError(#[from] csv::Error),
-	#[error("unknown dict error")]
-	Unknown,
-}
-
-#[derive(Error, Debug)]
-pub enum CsvError {
-	#[error("invalid serialization")]
-	SerializeError(#[from] csv::Error),
-	#[error("invalid parsing")]
+	#[error(transparent)]
 	WriteError(#[from] io::Error),
-	#[error("unknown csv error")]
+	#[error(transparent)]
+	CsvStreamError(#[from] csv_stream::CsvError),
+	#[error(transparent)]
+	CsvError(#[from] csv::Error),
+	#[error("unknown dict error")]
 	Unknown,
 }
 
@@ -37,11 +33,11 @@ impl IntoIterator for Dict {
 }
 
 impl Dict {
-	pub fn from_src<T>(src: &str, get_text: fn(T) -> String) -> Result<Dict, DictError>
+	pub fn from_src<T>(src: &str, get_text: fn(T) -> String) -> Result<Self, DictError>
 	where
 		T: for<'de> serde::Deserialize<'de>,
 	{
-		let mut reader = read_csv(src.as_bytes());
+		let mut reader = csv_stream::read(src.as_bytes());
 		let mut dict = HashMap::new();
 
 		for record in reader.deserialize() {
@@ -62,13 +58,13 @@ impl Dict {
 		K: Hash + Eq,
 	{
 		let mut entries_src = HashMap::new();
-		for record in read_csv(src.as_bytes()).deserialize() {
+		for record in csv_stream::read(src.as_bytes()).deserialize() {
 			let (key, value) = get_entry(record?);
 			entries_src.insert(key, value);
 		}
 
 		let mut entries_dst = HashMap::new();
-		for record in read_csv(dst.as_bytes()).deserialize() {
+		for record in csv_stream::read(dst.as_bytes()).deserialize() {
 			let (key, value) = get_entry(record?);
 			entries_dst.insert(key, value);
 		}
@@ -79,32 +75,29 @@ impl Dict {
 			.collect();
 		Ok(Dict(dict))
 	}
-}
 
-#[inline]
-fn read_csv<R>(reader: R) -> csv::Reader<R>
-where
-	R: Read,
-{
-	csv::ReaderBuilder::new()
-		.delimiter(b'\t')
-		.has_headers(false)
-		.from_reader(reader)
-}
-
-pub fn write_csv<I, S, W>(records: I, writer: W) -> Result<(), CsvError>
-where
-	I: IntoIterator<Item = S>,
-	S: Serialize,
-	W: Write,
-{
-	let mut writer = csv::WriterBuilder::new()
-		.delimiter(b'\t')
-		.has_headers(false)
-		.from_writer(writer);
-	for record in records {
-		let _ = writer.serialize(record)?;
+	pub fn from_file_src<P, T>(path: P, get_text: fn(T) -> String) -> Result<Self, DictError>
+	where
+		P: AsRef<Path>,
+		T: for<'de> serde::Deserialize<'de>,
+	{
+		let src = csv_stream::read_file(path)?;
+		Self::from_src(&src, get_text)
 	}
-	let _ = writer.flush()?;
-	Ok(())
+
+	pub fn from_file_src_dst<P1, P2, T, K>(
+		path_src: P1,
+		path_dst: P2,
+		get_entry: fn(T) -> (K, String),
+	) -> Result<Self, DictError>
+	where
+		P1: AsRef<Path>,
+		P2: AsRef<Path>,
+		T: for<'de> serde::Deserialize<'de>,
+		K: Hash + Eq,
+	{
+		let src = csv_stream::read_file(path_src)?;
+		let dst = csv_stream::read_file(path_dst)?;
+		Self::from_src_dst(&src, &dst, get_entry)
+	}
 }
