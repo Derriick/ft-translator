@@ -1,4 +1,4 @@
-use std::collections::hash_map::IntoIter;
+use std::collections::hash_map::{IntoIter, Iter, IterMut};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::io;
@@ -21,6 +21,26 @@ pub enum DictError {
 }
 
 pub struct Dict(HashMap<String, Option<String>>);
+
+impl<'a> IntoIterator for &'a Dict {
+	 type Item = (&'a String, &'a Option<String>);
+	 type IntoIter = Iter<'a, String, Option<String>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Dict {
+    type Item = (&'a String, &'a mut Option<String>);
+    type IntoIter = IterMut<'a, String, Option<String>>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter_mut()
+    }
+}
 
 impl IntoIterator for Dict {
 	type Item = (String, Option<String>);

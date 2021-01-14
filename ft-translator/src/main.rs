@@ -3,8 +3,7 @@ use std::io;
 use anyhow::{Context, Result};
 use env_logger;
 use log::error;
-use translator::csv_stream;
-use translator::dict::Dict;
+use translator::{csv_stream, dict::Dict};
 
 mod options;
 use crate::options::*;
