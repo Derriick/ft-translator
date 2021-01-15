@@ -108,6 +108,7 @@ fn matches<'a>() -> ArgMatches<'a> {
 				.value_names(&["SRC"])
 				.min_values(1)
 				.max_values(2)
+				.required_unless_one(&[MERGE_DICT, SWAP_DICT, TRANSLATE])
 				.conflicts_with_all(&[MERGE_DICT, SWAP_DICT, TRANSLATE])
 				.help(
 					"Create a new dictionary from a source file, and optionaly a destination file",
@@ -118,6 +119,7 @@ fn matches<'a>() -> ArgMatches<'a> {
 				.long(MERGE_DICT)
 				.short(short::MERGE_DICT)
 				.value_names(&["DICT1", "DICT2"])
+				.required_unless_one(&[CREATE_DICT, SWAP_DICT, TRANSLATE])
 				.conflicts_with_all(&[CREATE_DICT, SWAP_DICT, TRANSLATE])
 				.help("Merge two dictionaries"),
 		)
@@ -126,6 +128,7 @@ fn matches<'a>() -> ArgMatches<'a> {
 				.long(SWAP_DICT)
 				.short(short::SWAP_DICT)
 				.value_names(&["DICT"])
+				.required_unless_one(&[CREATE_DICT, MERGE_DICT, TRANSLATE])
 				.conflicts_with_all(&[CREATE_DICT, MERGE_DICT, TRANSLATE])
 				.help("Swap the source and destination of a dictionary"),
 		)
@@ -134,6 +137,7 @@ fn matches<'a>() -> ArgMatches<'a> {
 				.long(TRANSLATE)
 				.short(short::TRANSLATE)
 				.value_names(&["SRC", "DICT"])
+				.required_unless_one(&[CREATE_DICT, MERGE_DICT, SWAP_DICT])
 				.conflicts_with_all(&[CREATE_DICT, MERGE_DICT, SWAP_DICT])
 				.help("Translate a source file with a dictionary"),
 		)
