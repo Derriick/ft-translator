@@ -6,8 +6,6 @@ use encoding_rs_io::DecodeReaderBytes;
 use serde::Serialize;
 use thiserror::Error;
 
-pub type Error = csv::Error;
-
 #[derive(Error, Debug)]
 pub enum CsvError {
 	#[error("Error in serialization")]

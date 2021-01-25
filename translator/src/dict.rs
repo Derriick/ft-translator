@@ -2,18 +2,17 @@ use std::collections::hash_map::{IntoIter, Iter, IterMut};
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::io;
-use std::path::Path;
 
 use thiserror::Error;
 
-use crate::csv_stream;
+use crate::csv as csv_helper;
 
 #[derive(Error, Debug)]
 pub enum DictError {
 	#[error(transparent)]
 	WriteError(#[from] io::Error),
 	#[error(transparent)]
-	CsvStreamError(#[from] csv_stream::CsvError),
+	CsvStreamError(#[from] csv_helper::CsvError),
 	#[error(transparent)]
 	CsvError(#[from] csv::Error),
 	#[error("unknown dict error")]
@@ -28,22 +27,12 @@ impl Dict {
 		Ok(Dict(entries))
 	}
 
-	pub fn from_file_dict<P>(
-		path: P,
-	) -> Result<Self, DictError>
-	where
-		P: AsRef<Path>,
-	{
-		let dict = csv_stream::read_file(path)?;
-		Self::from_dict(&dict)
-	}
-
 	pub fn from_src<T, K>(src: &str, get_entry: fn(T) -> (K, String)) -> Result<Self, DictError>
 	where
 		T: for<'de> serde::Deserialize<'de>,
 		K: Hash + Eq,
 	{
-		let mut reader = csv_stream::read(src.as_bytes());
+		let mut reader = csv_helper::read(src.as_bytes());
 		let mut dict = HashMap::new();
 		for record in reader.deserialize() {
 			let (_, src) = get_entry(record?);
@@ -51,19 +40,6 @@ impl Dict {
 		}
 
 		Ok(Dict(dict))
-	}
-
-	pub fn from_file_src<P, T, K>(
-		path: P,
-		get_entry: fn(T) -> (K, String),
-	) -> Result<Self, DictError>
-	where
-		P: AsRef<Path>,
-		T: for<'de> serde::Deserialize<'de>,
-		K: Hash + Eq,
-	{
-		let src = csv_stream::read_file(path)?;
-		Self::from_src(&src, get_entry)
 	}
 
 	pub fn from_src_dst<T, K>(
@@ -85,49 +61,19 @@ impl Dict {
 		Ok(Dict(dict))
 	}
 
-	pub fn from_file_src_dst<P1, P2, T, K>(
-		path_src: P1,
-		path_dst: P2,
-		get_entry: fn(T) -> (K, String),
-	) -> Result<Self, DictError>
-	where
-		P1: AsRef<Path>,
-		P2: AsRef<Path>,
-		T: for<'de> serde::Deserialize<'de>,
-		K: Hash + Eq,
-	{
-		let src = csv_stream::read_file(path_src)?;
-		let dst = csv_stream::read_file(path_dst)?;
-		Self::from_src_dst(&src, &dst, get_entry)
+	pub fn merge(mut self, dict2: Self) -> Self {
+		self.0.extend(dict2.0);
+		self
 	}
 
-	pub fn merge(dict1: &str, dict2: &str) -> Result<Self, DictError> {
-		let mut entries1 = get_entries(dict1, |(k, v)| (k, v))?;
-		let entries2 = get_entries(dict2, |(k, v)| (k, v))?;
-		entries1.extend(entries2);
-		Ok(Dict(entries1))
-	}
-
-	pub fn merge_file<P1, P2>(path_dict1: P1, path_dict2: P2) -> Result<Self, DictError>
-	where
-		P1: AsRef<Path>,
-		P2: AsRef<Path>,
-	{
-		let dict1 = csv_stream::read_file(path_dict1)?;
-		let dict2 = csv_stream::read_file(path_dict2)?;
-		Self::merge(&dict1, &dict2)
-	}
-
-	pub fn swap(dict: &str) -> Result<Self, DictError> {
-		get_entries(dict, |(k, v)| (v, k)).map(Dict)
-	}
-
-	pub fn swap_file<P>(path_dict: P) -> Result<Self, DictError>
-	where
-		P: AsRef<Path>,
-	{
-		let dict = csv_stream::read_file(path_dict)?;
-		Self::swap(&dict)
+	pub fn swap(self) -> Self {
+		let mut dict = HashMap::new();
+		for (k, v) in self {
+			if let Some(v) = v {
+				dict.insert(v, Some(k));
+			}
+		}
+		Dict(dict)
 	}
 
 	/*pub fn translate<T, K>(
@@ -185,7 +131,7 @@ where
 	K: Hash + Eq,
 {
 	let mut entries = HashMap::new();
-	for record in csv_stream::read(text.as_bytes()).deserialize() {
+	for record in csv_helper::read(text.as_bytes()).deserialize() {
 		let (key, value) = get_entry(record?);
 		entries.insert(key, value);
 	}

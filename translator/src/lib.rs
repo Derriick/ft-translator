@@ -1,2 +1,2 @@
-pub mod csv_stream;
+pub mod csv;
 pub mod dict;
