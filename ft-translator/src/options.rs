@@ -26,10 +26,11 @@ pub struct Options {
 }
 
 pub enum Command {
-	CreateDict(PathBuf, Option<PathBuf>),
-	MergeDict(PathBuf, PathBuf),
-	SwapDict(PathBuf),
-	Translate(PathBuf, PathBuf),
+	CreateDict { src: PathBuf, dst: Option<PathBuf> },
+	MergeDict { dict1: PathBuf, dict2: PathBuf },
+	SwapDict { dict: PathBuf },
+	Translate { src: PathBuf, dict: PathBuf },
+	None,
 }
 
 impl Options {
@@ -38,30 +39,22 @@ impl Options {
 
 		let command = {
 			if let Some(mut values) = matches.values_of(CREATE_DICT) {
-				let src = values.next().unwrap();
-				match values.next() {
-					Some(dst) => Command::CreateDict(
-						Path::new(src).to_path_buf(),
-						Some(Path::new(dst).to_path_buf()),
-					),
-					None => Command::CreateDict(Path::new(src).to_path_buf(), None),
-				}
+				let src = next_path(&mut values).unwrap();
+				let dst = next_path(&mut values);
+				Command::CreateDict { src, dst }
 			} else if let Some(mut values) = matches.values_of(MERGE_DICT) {
-				let dict1 = values.next().unwrap();
-				let dict2 = values.next().unwrap();
-				Command::MergeDict(
-					Path::new(dict1).to_path_buf(),
-					Path::new(dict2).to_path_buf(),
-				)
+				let dict1 = next_path(&mut values).unwrap();
+				let dict2 = next_path(&mut values).unwrap();
+				Command::MergeDict { dict1, dict2 }
 			} else if let Some(mut values) = matches.values_of(SWAP_DICT) {
-				let dict = values.next().unwrap();
-				Command::SwapDict(Path::new(dict).to_path_buf())
+				let dict = next_path(&mut values).unwrap();
+				Command::SwapDict { dict }
 			} else if let Some(mut values) = matches.values_of(TRANSLATE) {
-				let src = values.next().unwrap();
-				let dict = values.next().unwrap();
-				Command::Translate(Path::new(src).to_path_buf(), Path::new(dict).to_path_buf())
+				let src = next_path(&mut values).unwrap();
+				let dict = next_path(&mut values).unwrap();
+				Command::Translate { src, dict }
 			} else {
-				todo!()
+				Command::None
 			}
 		};
 		let verbosity = match matches.occurrences_of(VERBOSITY) {
@@ -94,6 +87,10 @@ impl Options {
 	pub fn output(&self) -> Option<&Path> {
 		self.output.as_ref().map(|p| p.as_path())
 	}
+}
+
+fn next_path(values: &mut clap::Values) -> Option<PathBuf> {
+	values.next().map(|p| Path::new(p).to_path_buf())
 }
 
 fn matches<'a>() -> ArgMatches<'a> {

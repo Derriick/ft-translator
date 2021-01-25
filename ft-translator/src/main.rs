@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 use std::io;
 
 use anyhow::{Context, Result};
@@ -22,11 +24,15 @@ fn main() {
 
 fn run(options: Options) -> Result<()> {
 	let result = match options.command() {
-		Command::CreateDict(path_src, None) => Dict::from_file_src(path_src, get_text)?,
-		Command::CreateDict(path_src, Some(path_dst)) => {
-			Dict::from_file_src_dst(path_src, path_dst, get_entry)?
-		}
-		_ => todo!(),
+		Command::CreateDict { src, dst: None } => Dict::from_file_src(src, get_entry)?,
+		Command::CreateDict {
+			src,
+			dst: Some(dst),
+		} => Dict::from_file_src_dst(src, dst, get_entry)?,
+		Command::MergeDict { dict1, dict2 } => Dict::merge_file(dict1, dict2)?,
+		Command::SwapDict { dict } => Dict::swap_file(dict)?,
+		Command::Translate { src, dict } => todo!(),
+		Command::None => todo!(),
 	};
 
 	let mut result = result.into_iter().collect::<Vec<_>>();
@@ -38,10 +44,6 @@ fn run(options: Options) -> Result<()> {
 		None => csv_stream::write(result, io::stdout())
 			.with_context(|| format!("Failed to write CSV records to STDOUT")),
 	}
-}
-
-fn get_text(record: (String, String, String, String)) -> String {
-	record.3
 }
 
 fn get_entry(record: (String, String, String, String)) -> ((String, String, String), String) {
