@@ -68,3 +68,17 @@ where
 	let writer = File::create(path)?;
 	write(records, writer)
 }
+
+pub fn write_collec<T>(collection: T, output: Option<&Path>) -> Result<(), CsvError>
+where
+	T: IntoIterator,
+	<T as IntoIterator>::Item: Ord + Serialize,
+{
+	let mut collection = collection.into_iter().collect::<Vec<_>>();
+	collection.sort();
+
+	match output {
+		Some(path) => write_file(collection, path),
+		None => write(collection, io::stdout()),
+	}
+}

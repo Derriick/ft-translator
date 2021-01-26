@@ -5,14 +5,14 @@ use std::io;
 
 use thiserror::Error;
 
-use crate::csv as csv_helper;
+use crate::csv_stream;
 
 #[derive(Error, Debug)]
 pub enum DictError {
 	#[error(transparent)]
 	WriteError(#[from] io::Error),
 	#[error(transparent)]
-	CsvStreamError(#[from] csv_helper::CsvError),
+	CsvStreamError(#[from] csv_stream::CsvError),
 	#[error(transparent)]
 	CsvError(#[from] csv::Error),
 	#[error("unknown dict error")]
@@ -32,7 +32,7 @@ impl Dict {
 		T: for<'de> serde::Deserialize<'de>,
 		K: Hash + Eq,
 	{
-		let mut reader = csv_helper::read(src.as_bytes());
+		let mut reader = csv_stream::read(src.as_bytes());
 		let mut dict = HashMap::new();
 		for record in reader.deserialize() {
 			let (_, src) = get_entry(record?);
@@ -76,7 +76,7 @@ impl Dict {
 		Dict(dict)
 	}
 
-	/*pub fn translate<T, K>(
+	pub fn translate<T, K>(
 		&self,
 		src: &str,
 		get_entry: fn(T) -> (K, String),
@@ -86,13 +86,20 @@ impl Dict {
 		K: Hash + Eq,
 	{
 		let entries_src = get_entries(src, get_entry)?;
-
-		let entries_dst: HashMap<K, String> = entries_src
+		let entries_dst = entries_src
 			.into_iter()
-			.map(|(key, value)| (value, self.0.get(&key).map(String::from).unwrap_or(String::new())))
+			.map(|(key, value)| {
+				(
+					key,
+					self.0
+						.get(&value)
+						.map(|v| v.clone().map(String::from).unwrap_or(String::new()))
+						.unwrap_or(String::new()),
+				)
+			})
 			.collect();
 		Ok(entries_dst)
-	}*/
+	}
 }
 
 impl<'a> IntoIterator for &'a Dict {
@@ -131,7 +138,7 @@ where
 	K: Hash + Eq,
 {
 	let mut entries = HashMap::new();
-	for record in csv_helper::read(text.as_bytes()).deserialize() {
+	for record in csv_stream::read(text.as_bytes()).deserialize() {
 		let (key, value) = get_entry(record?);
 		entries.insert(key, value);
 	}

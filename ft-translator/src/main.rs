@@ -1,11 +1,7 @@
-#![allow(unused_variables)]
-
-use std::io;
-
-use anyhow::{Context, Result};
+use anyhow::Result;
 use env_logger;
 use log::error;
-use translator::{csv, dict::Dict};
+use translator::{csv_stream, dict::Dict};
 
 mod options;
 use crate::options::*;
@@ -23,44 +19,45 @@ fn main() {
 }
 
 fn run(options: Options) -> Result<()> {
-	let result = match options.command() {
+	match options.command() {
 		Command::CreateDict { src, dst: None } => {
-			let src = csv::read_file(src)?;
-			Dict::from_src(&src, get_entry)?
+			let src = csv_stream::read_file(src)?;
+			let result = Dict::from_src(&src, get_entry)?;
+			csv_stream::write_collec(result, options.output())?
 		}
 		Command::CreateDict {
 			src,
 			dst: Some(dst),
 		} => {
-			let src = csv::read_file(src)?;
-			let dst = csv::read_file(dst)?;
-			Dict::from_src_dst(&src, &dst, get_entry)?
+			let src = csv_stream::read_file(src)?;
+			let dst = csv_stream::read_file(dst)?;
+			let result = Dict::from_src_dst(&src, &dst, get_entry)?;
+			csv_stream::write_collec(result, options.output())?
 		}
 		Command::MergeDict { dict1, dict2 } => {
-			let dict1 = csv::read_file(dict1)?;
-			let dict2 = csv::read_file(dict2)?;
+			let dict1 = csv_stream::read_file(dict1)?;
+			let dict2 = csv_stream::read_file(dict2)?;
 			let dict1 = Dict::from_dict(&dict1)?;
 			let dict2 = Dict::from_dict(&dict2)?;
-			Dict::merge(dict1, dict2)
+			let result = dict1.merge(dict2);
+			csv_stream::write_collec(result, options.output())?
 		}
 		Command::SwapDict { dict } => {
-			let dict = csv::read_file(dict)?;
+			let dict = csv_stream::read_file(dict)?;
 			let dict = Dict::from_dict(&dict)?;
-			Dict::swap(dict)
+			let result = dict.swap();
+			csv_stream::write_collec(result, options.output())?
 		}
-		Command::Translate { src, dict } => todo!(),
+		Command::Translate { src, dict } => {
+			let src = csv_stream::read_file(src)?;
+			let dict = csv_stream::read_file(dict)?;
+			let dict = Dict::from_dict(&dict)?;
+			let result = dict.translate(&src, get_entry)?;
+			csv_stream::write_collec(result, options.output())?
+		}
 		Command::None => todo!(),
 	};
-
-	let mut result = result.into_iter().collect::<Vec<_>>();
-	result.sort();
-
-	match options.output() {
-		Some(path) => csv::write_file(result, path)
-			.with_context(|| format!("Failed to write CSV records to file '{}'", path.display())),
-		None => csv::write(result, io::stdout())
-			.with_context(|| format!("Failed to write CSV records to STDOUT")),
-	}
+	Ok(())
 }
 
 fn get_entry(record: (String, String, String, String)) -> ((String, String, String), String) {
