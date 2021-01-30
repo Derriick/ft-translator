@@ -72,13 +72,23 @@ where
 pub fn write_collec<T>(collection: T, output: Option<&Path>) -> Result<(), CsvError>
 where
 	T: IntoIterator,
-	<T as IntoIterator>::Item: Ord + Serialize,
+	<T as IntoIterator>::Item: Serialize,
 {
-	let mut collection = collection.into_iter().collect::<Vec<_>>();
-	collection.sort();
+	let collection = collection.into_iter().collect::<Vec<_>>();
 
 	match output {
 		Some(path) => write_file(collection, path),
 		None => write(collection, io::stdout()),
 	}
+}
+
+pub fn get_vec<T, K, V>(text: &str, get_entry: fn(T) -> (K, V)) -> Result<Vec<(K, V)>, CsvError>
+where
+	T: for<'de> serde::Deserialize<'de>,
+{
+	let mut entries = Vec::new();
+	for record in read(text.as_bytes()).deserialize() {
+		entries.push(get_entry(record?));
+	}
+	Ok(entries)
 }

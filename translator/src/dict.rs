@@ -3,9 +3,13 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::io;
 
+use serde::Deserialize;
 use thiserror::Error;
 
 use crate::csv_stream;
+use crate::translation::Translation;
+
+pub struct Dict(HashMap<Translation, Option<Translation>>);
 
 #[derive(Error, Debug)]
 pub enum DictError {
@@ -19,24 +23,34 @@ pub enum DictError {
 	Unknown,
 }
 
-pub struct Dict(HashMap<String, Option<String>>);
-
 impl Dict {
 	pub fn from_dict(dict: &str) -> Result<Self, DictError> {
-		let entries = get_entries(dict, |(k, v)| (k, v))?;
-		Ok(Dict(entries))
+		let mut translations: HashMap<Translation, Option<Translation>> = HashMap::new();
+		for (k, v) in csv_stream::get_vec(dict, |(k, v): (String, String)| (k, v))? {
+			let key = Translation::from(&k);
+			let val = if v.is_empty() {
+				None
+			} else {
+				Some(Translation::from(&v))
+			};
+
+			// TODO: handle duplicates: if key already prsent and val different
+			translations.insert(key, val);
+		}
+
+		Ok(Dict(translations))
 	}
 
 	pub fn from_src<T, K>(src: &str, get_entry: fn(T) -> (K, String)) -> Result<Self, DictError>
 	where
-		T: for<'de> serde::Deserialize<'de>,
+		T: for<'de> Deserialize<'de>,
 		K: Hash + Eq,
 	{
 		let mut reader = csv_stream::read(src.as_bytes());
 		let mut dict = HashMap::new();
 		for record in reader.deserialize() {
 			let (_, src) = get_entry(record?);
-			dict.insert(src, None);
+			dict.insert(Translation::from(&src), None);
 		}
 
 		Ok(Dict(dict))
@@ -48,15 +62,20 @@ impl Dict {
 		get_entry: fn(T) -> (K, String),
 	) -> Result<Self, DictError>
 	where
-		T: for<'de> serde::Deserialize<'de>,
+		T: for<'de> Deserialize<'de>,
 		K: Hash + Eq,
 	{
-		let entries_src = get_entries(src, get_entry)?;
-		let entries_dst = get_entries(dst, get_entry)?;
+		let entries_src = csv_stream::get_vec(src, get_entry)?;
+		let entries_dst: HashMap<_, _> = csv_stream::get_vec(dst, get_entry)?.into_iter().collect();
 
 		let dict: HashMap<_, _> = entries_src
 			.into_iter()
-			.map(|(key, value)| (value, entries_dst.get(&key).map(String::from)))
+			.map(|(key, value)| {
+				(
+					Translation::from(&value),
+					entries_dst.get(&key).map(|v| Translation::from(&v)),
+				)
+			})
 			.collect();
 		Ok(Dict(dict))
 	}
@@ -80,31 +99,29 @@ impl Dict {
 		&self,
 		src: &str,
 		get_entry: fn(T) -> (K, String),
-	) -> Result<HashMap<K, String>, DictError>
+	) -> Result<Vec<(K, String)>, DictError>
 	where
-		T: for<'de> serde::Deserialize<'de>,
-		K: Hash + Eq,
+		T: for<'de> Deserialize<'de>,
 	{
-		let entries_src = get_entries(src, get_entry)?;
-		let entries_dst = entries_src
-			.into_iter()
-			.map(|(key, value)| {
-				(
-					key,
-					self.0
-						.get(&value)
-						.map(|v| v.clone().map(String::from).unwrap_or(String::new()))
-						.unwrap_or(String::new()),
-				)
-			})
-			.collect();
+		let entries_src = csv_stream::get_vec(src, get_entry)?;
+		let mut entries_dst = Vec::new();
+		for (k, v) in entries_src {
+			let value = match self.0.get(&Translation::from(&v)) {
+				Some(t) => match t {
+					Some(t) => t.translate(&v).unwrap_or(v), // TODO: handle errors
+					None => String::new(),
+				},
+				None => String::new(),
+			};
+			entries_dst.push((k, value));
+		}
 		Ok(entries_dst)
 	}
 }
 
 impl<'a> IntoIterator for &'a Dict {
-	type Item = (&'a String, &'a Option<String>);
-	type IntoIter = Iter<'a, String, Option<String>>;
+	type Item = (&'a Translation, &'a Option<Translation>);
+	type IntoIter = Iter<'a, Translation, Option<Translation>>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
@@ -113,8 +130,8 @@ impl<'a> IntoIterator for &'a Dict {
 }
 
 impl<'a> IntoIterator for &'a mut Dict {
-	type Item = (&'a String, &'a mut Option<String>);
-	type IntoIter = IterMut<'a, String, Option<String>>;
+	type Item = (&'a Translation, &'a mut Option<Translation>);
+	type IntoIter = IterMut<'a, Translation, Option<Translation>>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
@@ -123,24 +140,11 @@ impl<'a> IntoIterator for &'a mut Dict {
 }
 
 impl IntoIterator for Dict {
-	type Item = (String, Option<String>);
-	type IntoIter = IntoIter<String, Option<String>>;
+	type Item = (Translation, Option<Translation>);
+	type IntoIter = IntoIter<Translation, Option<Translation>>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
 		self.0.into_iter()
 	}
-}
-
-fn get_entries<T, K, V>(text: &str, get_entry: fn(T) -> (K, V)) -> Result<HashMap<K, V>, DictError>
-where
-	T: for<'de> serde::Deserialize<'de>,
-	K: Hash + Eq,
-{
-	let mut entries = HashMap::new();
-	for record in csv_stream::read(text.as_bytes()).deserialize() {
-		let (key, value) = get_entry(record?);
-		entries.insert(key, value);
-	}
-	Ok(entries)
 }
