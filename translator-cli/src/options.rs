@@ -85,7 +85,7 @@ impl Options {
 
 	#[inline]
 	pub fn output(&self) -> Option<&Path> {
-		self.output.as_ref().map(|p| p.as_path())
+		self.output.as_deref()
 	}
 }
 

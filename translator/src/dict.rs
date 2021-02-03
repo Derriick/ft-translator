@@ -7,9 +7,9 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::csv_stream;
-use crate::translation::Translation;
+use crate::def::Def;
 
-pub struct Dict(HashMap<Translation, Option<Translation>>);
+pub struct Dict(HashMap<Def, Option<Def>>);
 
 #[derive(Error, Debug)]
 pub enum DictError {
@@ -25,16 +25,16 @@ pub enum DictError {
 
 impl Dict {
 	pub fn from_dict(dict: &str) -> Result<Self, DictError> {
-		let mut translations: HashMap<Translation, Option<Translation>> = HashMap::new();
+		let mut translations: HashMap<Def, Option<Def>> = HashMap::new();
 		for (k, v) in csv_stream::get_vec(dict, |(k, v): (String, String)| (k, v))? {
-			let key = Translation::from(&k);
+			let key = Def::from_def(&k);
 			let val = if v.is_empty() {
 				None
 			} else {
-				Some(Translation::from(&v))
+				Some(Def::from_def(&v))
 			};
 
-			// TODO: handle duplicates: if key already prsent and val different
+			// TODO: handle duplicates: if key already present and val different
 			translations.insert(key, val);
 		}
 
@@ -50,7 +50,7 @@ impl Dict {
 		let mut dict = HashMap::new();
 		for record in reader.deserialize() {
 			let (_, src) = get_entry(record?);
-			dict.insert(Translation::from(&src), None);
+			dict.insert(Def::from_text(&src), None);
 		}
 
 		Ok(Dict(dict))
@@ -72,8 +72,8 @@ impl Dict {
 			.into_iter()
 			.map(|(key, value)| {
 				(
-					Translation::from(&value),
-					entries_dst.get(&key).map(|v| Translation::from(&v)),
+					Def::from_text(&value),
+					entries_dst.get(&key).map(|v| Def::from_text(&v)),
 				)
 			})
 			.collect();
@@ -106,7 +106,7 @@ impl Dict {
 		let entries_src = csv_stream::get_vec(src, get_entry)?;
 		let mut entries_dst = Vec::new();
 		for (k, v) in entries_src {
-			let value = match self.0.get(&Translation::from(&v)) {
+			let value = match self.0.get(&Def::from_text(&v)) {
 				Some(t) => match t {
 					Some(t) => t.translate(&v).unwrap_or(v), // TODO: handle errors
 					None => String::new(),
@@ -120,8 +120,8 @@ impl Dict {
 }
 
 impl<'a> IntoIterator for &'a Dict {
-	type Item = (&'a Translation, &'a Option<Translation>);
-	type IntoIter = Iter<'a, Translation, Option<Translation>>;
+	type Item = (&'a Def, &'a Option<Def>);
+	type IntoIter = Iter<'a, Def, Option<Def>>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
@@ -130,8 +130,8 @@ impl<'a> IntoIterator for &'a Dict {
 }
 
 impl<'a> IntoIterator for &'a mut Dict {
-	type Item = (&'a Translation, &'a mut Option<Translation>);
-	type IntoIter = IterMut<'a, Translation, Option<Translation>>;
+	type Item = (&'a Def, &'a mut Option<Def>);
+	type IntoIter = IterMut<'a, Def, Option<Def>>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
@@ -140,8 +140,8 @@ impl<'a> IntoIterator for &'a mut Dict {
 }
 
 impl IntoIterator for Dict {
-	type Item = (Translation, Option<Translation>);
-	type IntoIter = IntoIter<Translation, Option<Translation>>;
+	type Item = (Def, Option<Def>);
+	type IntoIter = IntoIter<Def, Option<Def>>;
 
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {

@@ -143,11 +143,8 @@ dependencies = [
 name = "ft-translator"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "clap",
- "env_logger",
  "log",
- "translator",
+ "translator-cli",
  "winres",
 ]
 
@@ -198,6 +195,12 @@ name = "memchr"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
+
+[[package]]
+name = "once_cell"
+version = "1.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13bd41f508810a131401606d54ac32a467c97172d74ba7662562ebba5ad07fa0"
 
 [[package]]
 name = "proc-macro2"
@@ -327,11 +330,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.0"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb9bc092d0d51e76b2b19d9d85534ffc9ec2db959a2523cdae0697e2972cd447"
+checksum = "d8208a331e1cb318dd5bd76951d2b8fc48ca38a69f5f4e4af1b6a9f8c6236915"
 dependencies = [
- "lazy_static",
+ "once_cell",
 ]
 
 [[package]]
@@ -352,6 +355,19 @@ dependencies = [
  "encoding_rs_io",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "translator-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "log",
+ "serde",
+ "translator",
+ "winres",
 ]
 
 [[package]]

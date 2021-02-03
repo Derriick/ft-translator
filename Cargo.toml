@@ -1,8 +1,9 @@
 [workspace]
 
 members = [
-	"translator",
 	"ft-translator",
+	"translator",
+	"translator-cli",
 ]
 
 [profile.release]

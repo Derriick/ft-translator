@@ -5,7 +5,7 @@ use serde::ser::{Serialize, SerializeStruct, Serializer};
 use thiserror::Error;
 
 #[derive(PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Translation(Vec<Text>);
+pub struct Def(Vec<Text>);
 
 #[derive(PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Text {
@@ -14,28 +14,31 @@ enum Text {
 }
 
 #[derive(Error, Debug)]
-pub enum TranslationError {
-	#[error("unknown translation error")]
+pub enum DefError {
+	#[error("unknown def error")]
 	Unknown,
 }
 
-impl Translation {
-	pub fn from(text: &str) -> Self {
+impl Def {
+	pub fn from_text(text: &str) -> Self {
+		todo!()
+	}
+	pub fn from_def(text: &str) -> Self {
 		todo!()
 	}
 
-	pub fn translate(&self, text: &str) -> Result<String, TranslationError> {
+	pub fn translate(&self, text: &str) -> Result<String, DefError> {
 		// TODO: reconstruct src translation from text to get the keys, apply elf translation
 		todo!()
 	}
 }
 
-impl Serialize for Translation {
+impl Serialize for Def {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
-		let mut s = serializer.serialize_struct("Translation", 1)?;
+		let mut s = serializer.serialize_struct("Def", 1)?;
 		let text = self
 			.0
 			.iter()
